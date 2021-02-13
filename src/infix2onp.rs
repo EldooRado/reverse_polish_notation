@@ -1,64 +1,93 @@
 use std::collections::HashSet;
 
-pub fn transform_infix_to_onp() {
-    let mut stack = Vec::<char>::new();
-    let expression = String::from("((2+7)/3+(-14-3)*4)/2");
-
-    let mut is_number = false;
-    let mut minus_before_number = false;
-    let mut opened_bracket = false;
-    let mut number : i32 = 0;
-
-    if !expression.is_empty() && expression.chars().next().unwrap() == '-' {
-        opened_bracket = true;
+pub fn transform_infix_to_onp(infix_expression : String) {
+    enum ParserState {
+        Default,
+        Number,
+        MinusCheck
     }
 
-    for c in expression.chars() {
-        if opened_bracket  {
-            opened_bracket = false;
+    struct NumberInfo {
+        value : i32,
+        negative : bool
+    }
 
-            if c == '-'
-            {
-                minus_before_number = true;
-                continue;
-            }   
-        }
+    let higher_or_equal_priority_operators_than_plus_and_minus : HashSet<char> = 
+        vec!['^', '/', '*', '+', '-'].into_iter().collect();
 
-        if c >= '0' && c <= '9' {
-            is_number = true;
-            number = 10*number + c.to_digit(10).unwrap() as i32;
-            //println!("number{}",number);
-            continue;
-        }
-        else if is_number {
-            if minus_before_number {
-                number = -number;
+    let higher_or_equal_priority_operators_multiply_and_divide_sign : HashSet<char> = 
+        vec!['^', '/', '*'].into_iter().collect();
+        
+    let higher_or_equal_priority_operators_than_power_sign : HashSet<char> = 
+        vec!['^'].into_iter().collect();
+
+    let mut parser_state : ParserState = ParserState::MinusCheck;
+    let mut stack = Vec::<char>::new();
+    let mut number_info  = NumberInfo {value: 0, negative: false};
+    
+    for c in infix_expression.chars() {
+        match parser_state {
+            ParserState::Default => {}
+            ParserState::Number => {
+                if c < '0' || c > '9' {
+                    //change to one line if
+                    if number_info.negative {
+                        number_info.value = -number_info.value;
+                    }
+        
+                    print!("{} ", number_info.value);
+                    number_info.value = 0;
+                    number_info.negative = false;
+    
+                    parser_state = ParserState::Default;
+                }
             }
 
-            print!("{} ", number);
-            number = 0;
-            is_number = false;
-            minus_before_number = false;
-        }
+            // program needs to recognize a negative numbers so minus have two means. 
+            // First case when means substraction, second number is negative. Minus works
+            // in second way, only when is at the begin of expression or appears immediately 
+            // after opened bracket. I named this state as 'MinusCheck'
+            ParserState::MinusCheck => {
+                parser_state = ParserState::Default;
 
-        if c >= 'a' && c <= 'z' {
+                if c == '-' {
+                    number_info.negative = true;
+                    continue;
+                }
+            }
+        };
+
+        if c >= '0' && c <= '9' {
+            //if parser encouters a digit it means that there is a number
+            parser_state = ParserState::Number;
+            number_info.value = 10*number_info.value + c.to_digit(10).unwrap() as i32;
+            continue;
+        }
+        else if c >= 'a' && c <= 'z' {
             print!("{} ", c);
         }
         else if c == '-' || c == '+' || c == '*' || c == '/' || c == '^' {
-            let mut higher_or_equal_priority_operators : HashSet<char> = HashSet::<char>::new();
-            higher_or_equal_priority_operators.insert('^');
-            
-            if c == '*' || c == '/' {
-                higher_or_equal_priority_operators.insert('*');
-                higher_or_equal_priority_operators.insert('/');
-            }
+            // the most complicated part. We need pop all operators till we find lower priority operator 
 
-            if c == '+' || c == '-' {
-                higher_or_equal_priority_operators.insert('*');
-                higher_or_equal_priority_operators.insert('/');
-                higher_or_equal_priority_operators.insert('+');
-                higher_or_equal_priority_operators.insert('-');
+            let mut higher_or_equal_priority_operators : &HashSet<char> = &HashSet::<char>::new();
+            match c {
+                '^' => {
+                    higher_or_equal_priority_operators = &higher_or_equal_priority_operators_than_power_sign;
+                }
+
+                '*' | '/' => {
+                    higher_or_equal_priority_operators = &higher_or_equal_priority_operators_multiply_and_divide_sign;
+                }
+
+                '+' | '-' => {
+                    higher_or_equal_priority_operators = &higher_or_equal_priority_operators_than_plus_and_minus;
+                }
+
+                _ => {
+                    //impossible case
+                }
             }
+            
 
             for i in (0 .. stack.len()).rev() {
                 if higher_or_equal_priority_operators.contains(&stack[i]) {
@@ -73,10 +102,11 @@ pub fn transform_infix_to_onp() {
             stack.push(c);
         }
         else if c == '(' {
-            opened_bracket = true;
             stack.push(c);
+            parser_state = ParserState::MinusCheck;
         }
         else if c == ')' {
+            //pop all operators from stack till a opening bracket
             for i in (0 .. stack.len()).rev() {
                 if stack[i] == '(' {
                     break;
@@ -87,6 +117,7 @@ pub fn transform_infix_to_onp() {
             stack.pop();
         }
         else if c.is_whitespace() {
+            //skip white characters
             continue;
         }
         else {
@@ -95,9 +126,13 @@ pub fn transform_infix_to_onp() {
         }
     }
 
-    if is_number {
-        print!("{} ", number);
+    // all characters are parsed. If last state is 'ParserState::Number' it means that
+    // some number is calculated and we need print it 
+    if let ParserState::Number = parser_state {
+        print!("{} ", number_info.value);
     }
+
+    // at the end we should print all operators from the stack 
     for c in (0..stack.len()).rev() {
         print!("{} ", stack[c]);
     }
