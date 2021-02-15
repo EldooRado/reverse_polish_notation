@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-pub fn transform_infix_to_onp(infix_expression : String) {
+pub fn infix2rpn(infix_expression : String) -> String{
     enum ParserState {
         Default,
         Number,
@@ -25,6 +25,8 @@ pub fn transform_infix_to_onp(infix_expression : String) {
     let mut stack = Vec::<char>::new();
     let mut number_info  = NumberInfo {value: 0, negative: false};
     
+    let mut rpn_string = String::new();
+
     for c in infix_expression.chars() {
         match parser_state {
             ParserState::Default => {}
@@ -35,7 +37,9 @@ pub fn transform_infix_to_onp(infix_expression : String) {
                         number_info.value = -number_info.value;
                     }
         
-                    print!("{} ", number_info.value);
+                    rpn_string.push_str(&number_info.value.to_string());
+                    rpn_string.push(' ');
+
                     number_info.value = 0;
                     number_info.negative = false;
     
@@ -64,7 +68,8 @@ pub fn transform_infix_to_onp(infix_expression : String) {
             continue;
         }
         else if c >= 'a' && c <= 'z' {
-            print!("{} ", c);
+            rpn_string.push(c);
+            rpn_string.push(' ');
         }
         else if c == '-' || c == '+' || c == '*' || c == '/' || c == '^' {
             // the most complicated part. We need pop all operators till we find lower priority operator 
@@ -91,7 +96,8 @@ pub fn transform_infix_to_onp(infix_expression : String) {
 
             for i in (0 .. stack.len()).rev() {
                 if higher_or_equal_priority_operators.contains(&stack[i]) {
-                    print!("{} ", stack[i]);
+                    rpn_string.push(stack[i]);
+                    rpn_string.push(' ');
                     stack.pop();
                 }
                 else {
@@ -111,7 +117,9 @@ pub fn transform_infix_to_onp(infix_expression : String) {
                 if stack[i] == '(' {
                     break;
                 }
-                print!("{} ", stack[i]);
+
+                rpn_string.push(stack[i]);
+                rpn_string.push(' ');
                 stack.pop();
             }
             stack.pop();
@@ -121,7 +129,7 @@ pub fn transform_infix_to_onp(infix_expression : String) {
             continue;
         }
         else {
-            println!("\nSomething wrong!. Check the input.");
+            println!("\nERROR: Input is not ifix expression.");
             std::process::exit(1);
         }
     }
@@ -129,12 +137,86 @@ pub fn transform_infix_to_onp(infix_expression : String) {
     // all characters are parsed. If last state is 'ParserState::Number' it means that
     // some number is calculated and we need print it 
     if let ParserState::Number = parser_state {
-        print!("{} ", number_info.value);
+        rpn_string.push_str(&number_info.value.to_string());
+        rpn_string.push(' ');
     }
 
     // at the end we should print all operators from the stack 
     for c in (0..stack.len()).rev() {
-        print!("{} ", stack[c]);
+        rpn_string.push(stack[c]);
+        rpn_string.push(' ');
     }
-    println!();
+    rpn_string
+}
+
+fn is_string_numeric(s: String) -> bool {
+    
+    let mut first_char = true;
+    for c in s.chars() {
+        if first_char && s.len() >= 2 {
+            //check if first char is '-'
+            first_char = false;
+            if c == '-' {
+                continue;
+            }
+        }
+
+        if !c.is_numeric() {
+            return false;
+        }
+    }
+    return true;
+}
+
+pub fn calculate_rpn(rpn_expression : String) -> i32 {
+
+    let mut stack = Vec::<i32>::new();
+    let elements = rpn_expression.split(" ");
+
+    for s in elements {
+        if s.len() == 0 {
+            continue;
+        }
+        else if is_string_numeric(s.to_string()) {
+            stack.push(s.parse().unwrap());
+            
+        }
+        else if s == "^" || s == "+" || s == "-" || s == "*" || s == "/" {
+            if stack.len() < 2 {
+                println!("\nERROR: Input is incorrect expression.");
+                return 0
+            }
+
+            let b = stack.pop().unwrap();
+            let a = stack.pop().unwrap();
+
+            match s {
+                "+" => {
+                    stack.push(a + b);
+                }
+                "-" => {
+                    stack.push(a - b);
+                }
+                "*" => {
+                    stack.push(a * b);
+                }
+                "/" => {
+                    stack.push(a / b);
+                }
+                "^" => {
+                    stack.push(a.pow(b as u32));
+                }
+                _ => {}
+            }
+        }
+        else {
+            println!("\nERROR: Input is not arythmetic expression.");
+            return 0
+        }
+    }
+    if stack.len() > 1 {
+        println!("\nERROR: Something wrong.");
+        return 0
+    }
+    stack.pop().unwrap()
 }
